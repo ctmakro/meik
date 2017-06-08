@@ -1,0 +1,11 @@
+{
+  "name": "meik",
+  "version": "1.0.0",
+  "description": "customized js class library that supports super methods",
+  "main": "meik.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Qin Yongliang",
+  "license": "ISC"
+}
