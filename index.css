@@ -1,12 +1,16 @@
 h1 {}
+body {
+    background-color: #a2656f;
+}
 .range{
     width:33%;
     display: inline-block;
     min-width: 200px;
 }
-.title{
-text-align: center;
+.titleouter{
+    text-align: center;
 }
+.title{text-align: center;display: inline-block;padding: 5px 45px;margin-bottom: 10px;background: url(paper_tinted.jpg);box-shadow: 4px 8px 20px 0px rgba(76, 40, 0, 0.22);}
 textarea:focus{
     outline: none;
     /* background-color: beige; */
@@ -20,11 +24,13 @@ textarea:focus{
     background-color: rgba(255, 249, 238, 0);
     /* max-width: 1024px; */
     height: 1024px;
-    font-family: consolas,arial;
+    font-family: monospace;
     font-size: 16px;
+    font-weight: normal;
 }
 .input{
-    background: white;
+    /* background: white; */
+    /* color: white; */
 }
 .input textarea{
 
@@ -36,4 +42,6 @@ textarea:focus{
     /* border-style: solid; */
     /* border-width: 1px; */
     background: url(paper_tinted.jpg);
+    /* background-color: rgb(255, 255, 255); */
+    box-shadow: 4px 8px 20px 0px rgba(76, 40, 0, 0.22);
 }
