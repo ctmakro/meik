@@ -8,9 +8,7 @@ var cond = function(){
   }
 }
 var print = console.log
-var put = function(){
-  process.stdout.write.apply(process.stdout,arguments)
-}
+
 var debug_flag = false
 var dp = function(){if(debug_flag)print.apply(null,arguments)}
 var range = i=>{var a=[];for(var j=0;j<i;j++)a.push(j);return a}
@@ -94,9 +92,10 @@ var sy_node = (s)=>new node('symbol',s)
 var li_node = ()=>new node('list')
 
 const eve = require('events')
-
-var SymbolStateMachine = eve.make(p=>{
+var InitResetMixin = p=>{
   p.init = thisf(t=>t.reset())
+}
+var SymbolStateMachine = eve.make(InitResetMixin).make(p=>{
   p.reset = thisf(t=>t.start())
 
   p.start = thisf(t=>{t.cache=''})
@@ -114,8 +113,7 @@ var StringStateMachine = SymbolStateMachine.make(p=>{
   })
 })
 
-var ListStateMachine = eve.make(p=>{
-  p.init = function(){this.reset()}
+var ListStateMachine = eve.make(InitResetMixin).make(p=>{
   p.reset = function(){
     this.rootnode = null//li_node(null)
     this.currnode = this.rootnode
@@ -141,10 +139,7 @@ var ListStateMachine = eve.make(p=>{
   }
 })
 
-var RefCounter = eve.make(p=>{
-  p.init = function(){
-    this.reset()
-  }
+var RefCounter = eve.make(InitResetMixin).make(p=>{
   p.reset = function(){
     this.count = 0
   }
@@ -170,10 +165,7 @@ var BraceCounter = RefCounter.make(p=>{
   }
 })
 
-var IndentStateMachine = eve.make(p=>{
-  p.init = function(){
-    this.reset()
-  }
+var IndentStateMachine = eve.make(InitResetMixin).make(p=>{
   p.reset=function(){
     dp('(ism)reset')
     this.stack = []
@@ -404,10 +396,10 @@ var parsing_statemachine = function(){
 
   csm.reg(['linestart','spacing','indenting','quoted'])
   ('newline','linestart',c=>{brc.closebraces()})
-  ('eos','eos',c=>{str_end()})
+  ('eos','eos',c=>{brc.closebraces();str_end()})
 
   csm.reg(['symboling'])
-  ('eos','eos',c=>{sy.end();str_end()})
+  ('eos','eos',c=>{sy.end();brc.closebraces();str_end()})
 
   function show_state_map(){print(csm.smap)}
 
@@ -443,6 +435,13 @@ var psm = parsing_statemachine()
 module.exports = psm
 
 var sp = depth=>put(range(depth*4).map(c=>' ').join(''))
+
+var strbuf = ''
+var put = function(s){
+  // process.stdout.write.apply(process.stdout,arguments)
+  strbuf += s
+}
+
 var expand = (node,depth)=>{
   depth=depth||0
   cond(
@@ -451,7 +450,7 @@ var expand = (node,depth)=>{
     node.type==='list',()=>{
       put('\n');sp(depth);put('(')
       node.children.map(c=>{expand(c,depth+1)})
-      put(')\n');sp(depth-1)
+      put(')');//sp(depth-1)
     },
     ()=>{throw new Error('unknown node type')}
   )()
@@ -459,7 +458,9 @@ var expand = (node,depth)=>{
 
 // visually explain
 psm.explain = function(node){
+  strbuf = ''
   expand(node)
+  return strbuf
 }
 
 function test(){
@@ -468,8 +469,33 @@ function test(){
 
   print('\nparsed:')
   var lot = psm.parse(program)
-  lot.map(psm.explain)
+  lot.map(n=>{print(psm.explain(n))})
+
+  print(listify(lot))
 }
 
 // test()
 // test()
+
+function listify(lot){
+  // var lot = psm.parse(prog)
+
+  var reduce_node = node=>{
+    return cond(
+      node.type==='list',()=>{return node.children.map(reduce_node)},
+      node.type==='string',()=>{return node.string},
+      node.type==='symbol',()=>{return node.symbol},
+      ()=>{throw new Error('unknown node type')}
+    )()
+  }
+
+  var res = lot.map(reduce_node)
+  return res
+}
+
+function json(s){
+  return JSON.stringify(s,null,4)
+}
+
+// print(json(listify(program)))
+psm.listify = listify
