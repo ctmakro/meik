@@ -274,14 +274,15 @@
             var input = geid('input');
             var json = geid('json');
             var lisp = geid('lisp');
-            var example = "\nprint 42\nprint\n  + 2\n    * 10 4\n\n+\n  * 4 3\n  * 15 2\n\n+ (* 4 3)(* 15 2\n\ndefun max2 (a b\n  cond\n    (> a b) a\n    t b\n\ndefun abs2 (x\n  cond\n    (> x 0) x\n    t (- 0 x\n\ndefun show-squares (start end\n  do\n    (i start (+ i 1\n    (> i end) (quote (done\n    format t '~A ~A~%' i (* i i\n\nshow-squares 2 5\n";
+            var example = "\nprint 42\nprint\n  + 2\n    * 10 4\n\n+\n  * 4 3\n  * 15 2\n\n+ (* 4 3)(* 15 2\n\ndefun max2 (a b\n  cond\n    (> a b) a\n    t b\n\nmax2 42 21\n\ndefun our-abs (x\n  cond\n    (> x 0) x\n    t (- 0 x\nour-abs -10\n\ndefun show-squares (start end\n  do\n    (i start (+ i 1\n    (> i end) (quote (done\n    format t '~A ~A~%' i (* i i\n\nshow-squares 2 5\n\ndefun fib (n\n  cond\n    (< n 2) 1\n    t (+ (fib (- n 1 )) (fib (- n 2\n\nprint (fib 20\n";
             input.value = example.trim();
             function translate() {
                 var program = input.value;
                 var lot = psm.parse(program);
                 var list = psm.listify(lot);
-                json.value = JSON.stringify(list, null, 4);
-                lisp.value = lot.map(function (n) { return psm.explain(n); }).join('').trim();
+                json.value = '/* JSON */\n' + list.map(function (l) { return JSON.stringify(l); }).join('\n\n').trim();
+                lisp.value = '(); Generated from right\n'
+                    + lot.map(function (n) { return psm.explain(n); }).join('').trim();
             }
             function trytranslate() {
                 try {
@@ -747,7 +748,7 @@
             };
             var expand = function (node, depth) {
                 depth = depth || 0;
-                cond(node.type === 'symbol', function () { put(' ' + node.symbol + ' '); }, node.type === 'string', function () { put(' (str)\'' + node.string + '\' '); }, node.type === 'list', function () {
+                cond(node.type === 'symbol', function () { put('' + node.symbol + ' '); }, node.type === 'string', function () { put('"' + node.string + '"'); }, node.type === 'list', function () {
                     put('\n');
                     sp(depth);
                     put('(');

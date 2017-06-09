@@ -445,8 +445,8 @@ var put = function(s){
 var expand = (node,depth)=>{
   depth=depth||0
   cond(
-    node.type==='symbol',()=>{put(' '+node.symbol+' ')},
-    node.type==='string',()=>{put(' (str)\''+node.string+'\' ')},
+    node.type==='symbol',()=>{put(''+node.symbol+' ')},
+    node.type==='string',()=>{put('"'+node.string+'"')},
     node.type==='list',()=>{
       put('\n');sp(depth);put('(')
       node.children.map(c=>{expand(c,depth+1)})
