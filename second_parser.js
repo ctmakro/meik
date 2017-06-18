@@ -37,17 +37,28 @@ var node = make(p=>{
     this.children.push(n)
   }
 
-  var space4 = i=>range(i*4).map(k=>' ').join('')
+  // pretty printing of tree
+  var vert = '│', hori = '─', bl = '└', ml = '├'
   var jfy = s=>s!==undefined?JSON.stringify(s):''
-  var visualize = function(n,depth){
-    depth = depth||0
-    var str = space4(depth)+n.type+':'+jfy(n.value)+'('+n.pos+')\n'
-    str += n.children.map(n=>visualize(n,depth+1)).join('')
-    return str
+
+  p.prettyprint = function(prefix,children_prefix){
+    var cp = children_prefix
+    var n = this
+    var out = ''
+    out += prefix
+    out += n.type+':'+jfy(n.value)+' ('+n.pos+') \n'
+    var cl = n.children.length
+    for(var i=0;i<cl;i++){
+      if(i!==cl-1)
+      out += n.children[i].prettyprint(cp + '├───', cp + '│   ');
+      else
+      out += n.children[i].prettyprint(cp + '└───', cp + '    ');
+    }
+    return out
   }
 
   p.visualize = function(){
-    return visualize(this)
+    return this.prettyprint('','')
   }
 })
 
@@ -79,25 +90,28 @@ var Rule = make(p=>{
     this.emitter = this.get_default_emitter()
     this._lookahead = false
   }
-  p.copy = function(){
+  p.wrap = function(){
     var r = new Rule(this.tester)
     r.emitter = this.emitter
     r._lookahead = this._lookahead
-    return r
+    var q = new Rule((nl,pos)=>{
+      return r.test(nl,pos)
+    })
+    return q
   }
 
   // emission
   p.get_default_emitter = thisf(t=>(a=>a)) // emit as is
   p.get_none_emitter = thisf(t=>(a=>[])) // emit nothing
   p.emit = function(emitter){
-    var r = this.copy()
+    var r = this.wrap()
     r.emitter = emitter||this.get_none_emitter()
     return r
   }
 
   // positioning
   p.lookahead = function(){
-    var r = this.copy()
+    var r = this.wrap()
     r._lookahead = true
     return r
   }
@@ -106,7 +120,8 @@ var Rule = make(p=>{
   p.test = function(nl,pos){
     var result = this.tester(nl,pos)
     if(failed(result))return result
-    result.emit = this.emitter(result.emit, pos)
+    result.emit = this._lookahead?[]:this.emitter(result.emit, pos)
+    if(!result.emit) throw new Error('emitter returned nothing')
     result.pos = this._lookahead?pos:result.pos
     return result
   }
@@ -133,7 +148,7 @@ var Rule = make(p=>{
   }
 
   p.parse = function(str){
-    print(str)
+    print('"'+str+'"')
 
     var rule = sos.emit().then(this).then((eos).emit()) // start and end matching
 
@@ -142,6 +157,8 @@ var Rule = make(p=>{
     if(failed(result))throw new Error(fancyerror(nl,result))
 
     var visualization = result.emit.map(n=>n.visualize())
+
+    print('->')
     print(visualization.join(''))
 
     return result.emit
@@ -157,8 +174,9 @@ var Rule = make(p=>{
     return this.emit(group(str))
   }
 
-  // logical transformation
+  // combination
   p.then = function(rule2){
+    checkrule(rule2)
     return new Rule((nl,pos)=>{
       var result1 = this.test(nl,pos)
       if(failed(result1))return result1
@@ -169,6 +187,7 @@ var Rule = make(p=>{
   }
 
   p.or = function(rule2){
+    checkrule(rule2)
     return new Rule((nl,pos)=>{
       var result1 = this.test(nl,pos)
       if(!failed(result1))return result1
@@ -176,7 +195,7 @@ var Rule = make(p=>{
     })
   }
 
-  p.not = function(rule2){
+  p.not = function(){
     return new Rule((nl,pos)=>{
       var result1 = this.test(nl,pos)
       if(failed(result1)) return {pos, emit:[]}
@@ -212,9 +231,11 @@ var Rule = make(p=>{
     })
   }
 })
-
 var checkchar = n=>{
   if(n.type!=='char')throw new Error('input node type not char')
+}
+var checkrule = r=>{
+  if(r&&r.tester){}else{throw new Error('input is not a rule')}
 }
 
 var cr = (det,name) => new Rule( // conditional rule generator
@@ -225,11 +246,12 @@ var cr = (det,name) => new Rule( // conditional rule generator
       n.pos = pos
       return {pos:pos+1, emit:[n]}
     }
-    return fail(pos,`char does not satisfy rule: ${name||det}`)
+    return fail(pos,`unexpected char: "${n.value}"\n`
+    +`does not satisfy rule: ${name||det}`)
   }
 )
 
-var eq = (ch,name)=>cr(c=>c===ch,(name||'== '+ch)) // equality rule generator
+var eq = (ch,name)=>cr(c=>c===ch,(name||`"${ch}"`)) // equality rule generator
 var arrayify = str=>str.split('')
 var within = str=>cr(c=>str.indexOf(c)>=0,'within '+str)
 var not_within = str=>cr(c=>str.indexOf(c)<0,'not within '+str)
@@ -241,8 +263,7 @@ var empty = new Rule(
   function(nl,pos){
     var n = nl.at(pos)
     checkchar(n)
-    var en = new node('empty'); en.pos = pos
-    return {pos, emit:[en]}
+    return {pos, emit:[]} // empty list matched
   }
 )
 
@@ -261,8 +282,8 @@ var bin = match('0b')
 .then(binary).then(binary.zeromore())
 .group('binary_literal')
 
-decstr.parse('12345')
-bin.parse('0b110')
+// decstr.parse('12345')
+// bin.parse('0b110')
 
 var wsp = eq(' ','whitespace')
 var newline = eq('\n','newline')
@@ -279,8 +300,20 @@ var decsym = iw.then(iiw((bin).or(decstr)).zeromore()).group('program')
 // decsym.parse('  ')
 // decsym.parse('  134 1 2')
 
+// rule reference
+var ref = rf => {
+  return new Rule(
+    function(stream,pos){
+      var r = rf()
+      checkrule(r)
+      return r.test.apply(r,arguments)
+    }
+  )
+}
+
 module.exports = {
   Rule,
+  node,
 
   // rule generators
   cr,
@@ -290,9 +323,10 @@ module.exports = {
   not_within,
 
   // default rules
-  wsp,
-  newline,
   empty,
   eos,
   sos,
+
+  // helper
+  ref,
 }
