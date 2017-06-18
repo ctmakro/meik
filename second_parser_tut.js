@@ -229,10 +229,21 @@ var abbr = free(exp)  // left: anything
 var prod = abbr.then(prod_operator.then(abbr).zeromore()).emit(infix)
 var sum = prod.then(sum_operator.then(prod).zeromore()).emit(infix)
 var expr = sum
+expr.parse('1')
+expr.parse('print(i)')
 expr.parse('2**3**f(u+me,g(h(,,3)))')
 expr.parse('f(9cc) / 2 a**3 -3 **2(5-7)2')
 
-// 5g. parse nested list with open brackets
+// 5g. parse entire program
+var assign_op = free(eq('=')).group('operator')
+var assignment = free(word).then(assign_op.then(expr).onemore()).emit(infix)
+var statement = assignment.or(expr).group('statement')
+var seperator = eq(';').emit()
+var program = free(statement.then(seperator.then(statement).zeromore())
+.group('program'))
+program.parse('i=8;c=2i;print(3c)')
+
+// 5h. parse nested list with open brackets
 var _elements = ref(()=>elements)
 var end_of_list = rbrac.or(eos.lookahead())
 // eos => end_of_string
